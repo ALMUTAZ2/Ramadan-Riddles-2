@@ -211,7 +211,7 @@
               </div>
           </div>
       </div> 
-            <script>
+      <script>
           // تهيئة Firebase
           const firebaseConfig = {
               apiKey: "AIzaSyC5RYK1lGaJaMQJmOH85cqNgv6m7rbLS_A",
@@ -257,7 +257,7 @@
               },
               {
                   question: "ما هو الشهر الذي فُرض فيه الصيام على المسلمين؟",
-                  options: ["شعبان", "رمضان", "محرم", "رجب"],
+                                    options: ["شعبان", "رمضان", "محرم", "رجب"],
                   correct: 1
               }
           ];
@@ -295,52 +295,6 @@
               alreadyParticipatedScreen: document.getElementById('already-participated-screen')
           };
 
-          // التحقق من وقت المسابقة
-          function checkQuizTime() {
-              const now = new Date();
-              const hours = now.getHours();
-              return hours >= 19 && hours < 20; // من 7 مساءً حتى 8 مساءً
-          }
-
-          // تحديث رسالة الوقت
-          function updateTimeMessage() {
-              const now = new Date();
-              const nextQuiz = new Date();
-              nextQuiz.setHours(19, 0, 0, 0); // 7 مساءً
-
-              if (now.getHours() >= 20) { // بعد 8 مساءً
-                  nextQuiz.setDate(nextQuiz.getDate() + 1);
-              }
-
-              const timeUntilQuiz = nextQuiz - now;
-              const hours = Math.floor(timeUntilQuiz / (1000 * 60 * 60));
-              const minutes = Math.floor((timeUntilQuiz % (1000 * 60 * 60)) / (1000 * 60));
-
-              let message;
-              if (now.getHours() >= 19 && now.getHours() < 20) {
-                  message = "المسابقة متاحة الآن!";
-              } else if (now.getHours() >= 20) {
-                  message = `المسابقة القادمة غداً في تمام الساعة 7 مساءً
-                          (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
-              } else {
-                  message = `المسابقة ستبدأ اليوم في تمام الساعة 7 مساءً
-                          (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
-              }
-
-              document.getElementById('time-message').textContent = message;
-          }
-
-          // تحديث التاريخ والوقت
-          function updateDateTime() {
-              const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-              const now = new Date();
-              const dayName = days[now.getDay()];
-              const date = now.toLocaleDateString('ar-SA');
-              
-              document.getElementById('day-name').textContent = dayName;
-              document.getElementById('current-date').textContent = date;
-          }
-
           // دوال التحقق والتخزين المحلي
           function simpleEncrypt(text) {
               return btoa(text + '_' + new Date().toDateString());
@@ -362,6 +316,50 @@
           function recordLocalParticipation() {
               const participationKey = simpleEncrypt('participated');
               localStorage.setItem('lastParticipation', participationKey);
+          }
+
+          // التحقق من وقت المسابقة
+          function checkQuizTime() {
+              const now = new Date();
+              const hours = now.getHours();
+              return hours >= 19 && hours < 20; // من 7 مساءً حتى 8 مساءً
+          }
+
+          // تحديث رسالة الوقت
+          function updateTimeMessage() {
+              const now = new Date();
+              const nextQuiz = new Date();
+              nextQuiz.setHours(19, 0, 0, 0);
+
+              if (now.getHours() >= 20) {
+                  nextQuiz.setDate(nextQuiz.getDate() + 1);
+              }
+
+              const timeUntilQuiz = nextQuiz - now;
+              const hours = Math.floor(timeUntilQuiz / (1000 * 60 * 60));
+              const minutes = Math.floor((timeUntilQuiz % (1000 * 60 * 60)) / (1000 * 60));
+
+              let message;
+              if (now.getHours() >= 19 && now.getHours() < 20) {
+                  message = "المسابقة متاحة الآن!";
+              } else if (now.getHours() >= 20) {
+                  message = `المسابقة القادمة غداً في تمام الساعة 7 مساءً (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
+              } else {
+                  message = `المسابقة ستبدأ اليوم في تمام الساعة 7 مساءً (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
+              }
+
+              document.getElementById('time-message').textContent = message;
+          }
+
+          // تحديث التاريخ والوقت
+          function updateDateTime() {
+              const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+              const now = new Date();
+              const dayName = days[now.getDay()];
+              const date = now.toLocaleDateString('ar-SA');
+              
+              document.getElementById('day-name').textContent = dayName;
+              document.getElementById('current-date').textContent = date;
           }
 
           // بدء العد التنازلي
@@ -401,8 +399,7 @@
               gameState.isAnswered = false;
               
               const question = gameState.questions[gameState.currentQuestion];
-              elements.questionCounter.textContent = 
-                  `السؤال ${gameState.currentQuestion + 1} من ${gameState.questions.length}`;
+              elements.questionCounter.textContent = `السؤال ${gameState.currentQuestion + 1} من ${gameState.questions.length}`;
               elements.questionText.textContent = question.question;
               
               elements.optionsContainer.innerHTML = question.options.map((option, index) => `
@@ -547,14 +544,24 @@
               try {
                   gameState.playerName = elements.playerNameInput.value.trim();
                   
-                  const hasParticipated = await checkPreviousParticipation();
-                  if (hasParticipated) {
+                  if (checkLocalParticipation()) {
                       elements.startScreen.classList.add('hidden');
                       elements.alreadyParticipatedScreen.classList.remove('hidden');
                       return;
                   }
 
-                  await recordParticipation();
+                  recordLocalParticipation();
+                  
+                  // تسجيل المشارك في Firebase للإحصائيات فقط
+                  try {
+                      await db.collection('participants').add({
+                          playerName: gameState.playerName,
+                          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                      });
+                  } catch (error) {
+                      console.error('Error recording participation in Firebase:', error);
+                      // لا نوقف المسابقة في حالة فشل التسجيل في Firebase
+                  }
                   
                   gameState.questions = [...questionBank];
                   elements.startScreen.classList.add('hidden');
@@ -588,33 +595,6 @@
               }
           }
 
-          // التحقق من المشاركة السابقة
-          async function checkPreviousParticipation() {
-              try {
-                  if (checkLocalParticipation()) {
-                      return true;
-                  }
-
-                  const now = new Date();
-                  const startTime = new Date(now);
-                  startTime.setHours(19, 0, 0, 0);
-                  
-                  if (now.getHours() < 19) {
-                      startTime.setDate(startTime.getDate() - 1);
-                  }
-                  
-                  const snapshot = await db.collection('participants')
-                      .where('playerName', '==', gameState.playerName)
-                      .where('timestamp', '>=', startTime)
-                      .get();
-
-                  return !snapshot.empty;
-              } catch (error) {
-                  console.error('Error checking participation:', error);
-                  return false;
-              }
-          }
-
           // إضافة مستمعي الأحداث
           elements.playerNameInput.addEventListener('input', () => {
               elements.startButton.disabled = !elements.playerNameInput.value.trim();
@@ -641,4 +621,4 @@
           });
       </script>
   </body>
-  </html>
+  </html> 
