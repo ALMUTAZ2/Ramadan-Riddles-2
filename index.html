@@ -433,35 +433,9 @@ const ramadanQuestions = {
     ]
 };
 
-// تعديل دالة initializeQuiz لتحديد اليوم وجلب الأسئلة المناسبة
-async function initializeQuiz() {
-    try {
-        updateDateTime();
-        
-        // تحديد اليوم الحالي من رمضان (15 في هذه الحالة)
-        const currentRamadanDay = 15; // يمكنك تعديل هذا حسب التاريخ الفعلي
-        
-        // التحقق من وجود أسئلة لليوم الحالي
-        if (!ramadanQuestions[currentRamadanDay]) {
-            console.error('لا توجد أسئلة لهذا اليوم');
-            alert('عذراً، لا توجد أسئلة متاحة لهذا اليوم');
-            return;
-        }
+// بنك الأسئلة المتاح
+let questionBank = [];
 
-        // تحديث بنك الأسئلة باستخدام أسئلة اليوم الحالي
-        questionBank = [...ramadanQuestions[currentRamadanDay]];
-        
-        elements.startScreen.classList.remove('hidden');
-    } catch (error) {
-        console.error('Error initializing quiz:', error);
-        alert('حدث خطأ في تحميل المسابقة. يرجى تحديث الصفحة.');
-    }
-}
-
-
-
-
-        
         // حالة اللعبة
         const gameState = {
             playerName: "",
@@ -501,8 +475,7 @@ async function initializeQuiz() {
         }
 
         function checkLocalParticipation() {
-            // تعطيل التحقق من المشاركة السابقة للسماح بالمشاركة المتكررة
-            return false;
+            return false; // تعطيل التحقق من المشاركة السابقة
         }
 
         function recordLocalParticipation() {
@@ -520,7 +493,7 @@ async function initializeQuiz() {
             document.getElementById('time-message').textContent = "المسابقة متاحة الآن!";
         }
 
-                // تحديث التاريخ والوقت
+        // تحديث التاريخ والوقت
         function updateDateTime() {
             const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
             const now = new Date();
@@ -552,7 +525,7 @@ async function initializeQuiz() {
                 }
 
                 const message = countdownMessages[currentIndex];
-                document.getElementById('countdown-number').textContent = message.number;
+                                document.getElementById('countdown-number').textContent = message.number;
                 document.getElementById('countdown-text').textContent = message.text;
 
                 currentIndex++;
@@ -713,7 +686,7 @@ async function initializeQuiz() {
             try {
                 gameState.playerName = elements.playerNameInput.value.trim();
                 
-                // تم تعطيل التحقق من المشاركة السابقة
+                // تسجيل المشاركة محلياً (تم تعطيل التحقق)
                 recordLocalParticipation();
                 
                 // تسجيل المشارك في Firebase للإحصائيات فقط
@@ -727,7 +700,19 @@ async function initializeQuiz() {
                     // لا نوقف المسابقة في حالة فشل التسجيل في Firebase
                 }
                 
-                gameState.questions = [...questionBank];
+                // تحديد اليوم الحالي من رمضان (يمكن تعديله حسب الحاجة)
+                const currentRamadanDay = 15;
+                
+                // التحقق من وجود أسئلة لليوم الحالي
+                if (!ramadanQuestions[currentRamadanDay]) {
+                    console.error('لا توجد أسئلة لهذا اليوم');
+                    alert('عذراً، لا توجد أسئلة متاحة لهذا اليوم');
+                    return;
+                }
+                
+                // تحديث بنك الأسئلة باستخدام أسئلة اليوم الحالي
+                gameState.questions = [...ramadanQuestions[currentRamadanDay]];
+                
                 elements.startScreen.classList.add('hidden');
                 elements.playerWelcome.textContent = `مرحباً ${gameState.playerName}!`;
                 
@@ -739,9 +724,10 @@ async function initializeQuiz() {
         }
 
         // تهيئة المسابقة
-        async function initializeQuiz() {
+        function initializeQuiz() {
             try {
                 updateDateTime();
+                
                 // المسابقة متاحة دائمًا الآن
                 elements.startScreen.classList.remove('hidden');
             } catch (error) {
@@ -756,11 +742,6 @@ async function initializeQuiz() {
         });
 
         elements.startButton.addEventListener('click', startQuiz);
-
-        // تم إزالة التحقق الدوري من الوقت لأن المسابقة متاحة دائمًا الآن
-
-        // بنك الأسئلة المتاح
-        let questionBank = [];
 
         // بدء التطبيق
         document.addEventListener('DOMContentLoaded', function() {
