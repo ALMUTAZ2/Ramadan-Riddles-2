@@ -1,1173 +1,1018 @@
-  <!DOCTYPE html>
-  <html dir="rtl" lang="ar">
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>فوازير رمضان 1446</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-      <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-      <style>
-          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-          
-          * {
-              font-family: 'Cairo', sans-serif;
-          }
-
-          @keyframes floatMoon {
-              0% { transform: translateY(0px); }
-              50% { transform: translateY(-10px); }
-              100% { transform: translateY(0px); }
-          }
-
-          .floating-moon {
-              animation: floatMoon 3s ease-in-out infinite;
-          }
-
-          @keyframes twinkle {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.3; }
-          }
-
-          .star {
-              position: absolute;
-              color: #FCD34D;
-              animation: twinkle 2s ease-in-out infinite;
-          }
-
-          .option-correct {
-              background-color: rgba(34, 197, 94, 0.2) !important;
-              border-color: rgb(34, 197, 94) !important;
-          }
-
-          .option-wrong {
-              background-color: rgba(239, 68, 68, 0.2) !important;
-              border-color: rgb(239, 68, 68) !important;
-          }
-
-          .option-disabled {
-              pointer-events: none;
-              opacity: 0.7;
-          }
-
-          @keyframes scaleNumber {
-              0% { transform: scale(1); opacity: 0; }
-              50% { transform: scale(1.5); opacity: 1; }
-              100% { transform: scale(1); opacity: 0; }
-          }
-
-          .countdown-number {
-              animation: scaleNumber 1s ease-out;
-          }
-
-          .countdown-text {
-              animation: fadeInUp 0.5s ease-out;
-          }
-
-          @keyframes fadeInUp {
-              from {
-                  opacity: 0;
-                  transform: translateY(20px);
-              }
-              to {
-                  opacity: 1;
-                  transform: translateY(0);
-              }
-          }
-      </style>
-  </head>
-  <body class="bg-gradient-to-b from-blue-900 to-indigo-950 min-h-screen">
-      <!-- شريط التاريخ -->
-      <div class="bg-white/5 backdrop-blur-sm border-b border-white/10 p-3 text-white text-center">
-          <div class="max-w-3xl mx-auto flex justify-between items-center">
-              <div class="flex items-center gap-2">
-                  <span id="day-name" class="text-blue-400"></span>
-              </div>
-              <div class="flex items-center gap-2">
-                  <span id="current-date" class="text-green-400"></span>
-              </div>
-          </div>
-      </div>
-
-      <!-- شاشة خارج وقت المسابقة -->
-      <div id="out-of-time-screen" class="hidden min-h-screen text-white flex items-center justify-center p-6">
-          <div class="max-w-md w-full">
-              <div class="bg-white/10 backdrop-blur-lg border-2 border-yellow-400/20 rounded-3xl p-8 text-center">
-                  <i data-lucide="clock" class="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
-                  <h2 class="text-2xl font-bold text-yellow-400 mb-4">المسابقة غير متاحة حالياً</h2>
-                  <p class="text-gray-300 mb-4">المسابقة متاحة يومياً من الساعة 7 مساءً حتى 8 مساءً</p>
-                  <div id="time-message" class="text-green-400 text-lg mb-8"></div>
-                  <a href="leaderboard.html" class="inline-block bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-8 py-3 rounded-xl">
-                      عرض نتائج المتصدرين
-                  </a>
-              </div>
-          </div>
-      </div>
-
-      <!-- شاشة المشاركة السابقة -->
-      <div id="already-participated-screen" class="hidden min-h-screen text-white flex items-center justify-center p-6">
-          <div class="max-w-md w-full">
-              <div class="bg-white/10 backdrop-blur-lg border-2 border-red-400/20 rounded-3xl p-8 text-center">
-                  <i data-lucide="alert-circle" class="w-16 h-16 mx-auto text-red-400 mb-4"></i>
-                  <h2 class="text-2xl font-bold text-red-400 mb-4">لقد شاركت مسبقاً</h2>
-                  <p class="text-gray-300 mb-6">يمكنك المشاركة مرة واحدة فقط في اليوم</p>
-                  <a href="leaderboard.html" class="inline-block bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-8 py-3 rounded-xl">
-                      عرض نتائج المتصدرين
-                  </a>
-              </div>
-          </div>
-      </div>
-
-      <!-- شاشة البداية -->
-      <div id="start-screen" class="hidden min-h-[calc(100vh-64px)] text-white flex items-center justify-center p-6">
-          <div class="max-w-md w-full">
-              <div class="bg-white/10 backdrop-blur-lg border-2 border-green-400/20 rounded-3xl p-8">
-                  <div class="text-center space-y-6">
-                      <div class="relative h-32">
-                          <div class="floating-moon">
-                              <i data-lucide="moon" class="w-20 h-20 mx-auto text-yellow-400"></i>
-                          </div>
-                          <div class="absolute bottom-0 w-full">
-                              <i data-lucide="star" class="star w-4 h-4" style="left: calc(50% - 20px);"></i>
-                              <i data-lucide="star" class="star w-4 h-4" style="left: 50%;"></i>
-                              <i data-lucide="star" class="star w-4 h-4" style="left: calc(50% + 20px);"></i>
-                          </div>
-                      </div>
-                      <h1 class="text-3xl font-bold text-yellow-400">فوازير رمضان</h1>
-                      <div class="space-y-4">
-                          <label class="text-lg block text-center mb-2">
-                              أدخل اسمك للمشاركة في المسابقة
-                          </label>
-                          <input
-                              type="text"
-                              id="player-name"
-                              placeholder="الاسم الكريم"
-                              class="w-full bg-white/5 border-2 border-green-400/20 text-center text-lg py-6 rounded-xl text-white"
-                          >
-                      </div>
-                      <button
-                          id="start-button"
-                          class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-6 rounded-xl text-lg flex items-center justify-center gap-2"
-                          disabled
-                      >
-                          <i data-lucide="sparkles" class="w-5 h-5"></i>
-                          بدء المسابقة
-                      </button>
-                  </div>
-              </div>
-          </div>
-      </div>
-
-      <!-- شاشة العد التنازلي -->
-      <div id="countdown-screen" class="fixed inset-0 bg-blue-900/95 backdrop-blur-sm hidden z-50 flex items-center justify-center">
-          <div class="text-center">
-              <div id="countdown-number" class="text-8xl font-bold text-yellow-400 mb-4 countdown-number"></div>
-              <div id="countdown-text" class="text-2xl text-white countdown-text"></div>
-          </div>
-      </div>
-
-      <!-- شاشة الأسئلة -->
-      <div id="quiz-screen" class="min-h-screen text-white p-6 hidden">
-          <div class="max-w-3xl mx-auto">
-              <div class="text-center mb-8">
-                  <h1 class="text-3xl font-bold text-yellow-400 mb-2">فوازير رمضان</h1>
-                  <p id="player-welcome" class="text-lg text-green-400"></p>
-              </div>
-              <div class="bg-white/10 backdrop-blur-lg border-2 border-green-400/20 rounded-2xl p-6">
-                  <div class="flex justify-between items-center mb-4">
-                      <div class="flex items-center gap-2">
-                          <i data-lucide="clock" class="w-5 h-5"></i>
-                          <span id="timer" class="text-xl font-bold">10</span>
-                      </div>
-                      <div id="question-counter" class="text-lg"></div>
-                  </div>
-                  <div class="relative h-2 bg-gray-700/50 rounded-full overflow-hidden mb-6">
-                      <div id="timer-bar" class="absolute top-0 left-0 h-full bg-green-400 transition-all duration-1000"></div>
-                  </div>
-                  <h3 id="question-text" class="text-xl font-semibold mb-6 pr-4 border-r-4 border-green-400"></h3>
-                  <div id="options-container" class="space-y-4"></div>
-              </div>
-          </div>
-      </div>
-
-      <!-- شاشة النتائج -->
-      <div id="results-screen" class="min-h-screen text-white p-6 hidden">
-          <div class="max-w-2xl mx-auto">
-              <div class="bg-white/10 backdrop-blur-lg border-2 border-yellow-400/30 rounded-2xl p-8">
-                  <i data-lucide="trophy" class="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
-                  <h3 class="text-2xl font-bold text-yellow-400 mb-4 text-center">النتيجة النهائية</h3>
-                  <p id="final-name" class="text-xl mb-4 text-center"></p>
-                  <p id="final-score" class="text-xl mb-6 text-center"></p>
-                  <div id="answers-review" class="space-y-4 mt-8"></div>
-                  <div class="flex gap-4 mt-6">
-                      <button onclick="location.reload()" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl text-lg">
-                          حاول مرة أخرى
-                      </button>
-                      <button onclick="window.location.href='leaderboard.html'" class="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white py-4 rounded-xl text-lg">
-                          قائمة المتصدرين
-                      </button>
-                  </div>
-              </div>
-          </div>
-      </div> 
-      <script>
-          // تهيئة Firebase
-          const firebaseConfig = {
-              apiKey: "AIzaSyC5RYK1lGaJaMQJmOH85cqNgv6m7rbLS_A",
-              authDomain: "ramadanmotaz-5570f.firebaseapp.com",
-              projectId: "ramadanmotaz-5570f",
-              storageBucket: "ramadanmotaz-5570f.appspot.com",
-              messagingSenderId: "595667154066",
-              appId: "1:595667154066:web:80ba616566ec55a5efe24b"
-          };
-
-          let db;
-          try {
-              if (!firebase.apps.length) {
-                  firebase.initializeApp(firebaseConfig);
-              }
-              db = firebase.firestore();
-              console.log('Firebase initialized successfully');
-          } catch (error) {
-              console.error('Error initializing Firebase:', error);
-          }
-
-          // بنك الأسئلة
-          
-const ramadanQuestions = {
-    15: [ // اليوم 15 من رمضان
-        {
-            question: "ما هي السورة التي نزلت في ليلة النصف من رمضان؟",
-            options: ["سورة الدخان", "سورة القدر", "سورة البقرة", "سورة يس"],
-            correct: 0
-        },
-        {
-            question: "كم عدد الركعات في صلاة التراويح التي كان يصليها النبي ﷺ؟",
-            options: ["8 ركعات", "11 ركعة", "20 ركعة", "23 ركعة"],
-            correct: 1
-        },
-        {
-            question: "ما هو دعاء النصف من رمضان المأثور؟",
-            options: [
-                "اللهم اغفر لي ذنوبي",
-                "اللهم إنك عفو تحب العفو فاعف عني",
-                "اللهم بلغنا رمضان",
-                "اللهم تقبل منا صيامنا"
-            ],
-            correct: 1
-        }
-    ],
-    16: [ // اليوم 16 من رمضان
-        {
-            question: "متى كانت غزوة بدر الكبرى؟",
-            options: ["17 رمضان السنة الثانية للهجرة", "15 رمضان السنة الثالثة للهجرة", "20 رمضان السنة الأولى للهجرة", "10 رمضان السنة الرابعة للهجرة"],
-            correct: 0
-        },
-        {
-            question: "من هو الصحابي الذي كان أول مؤذن في الإسلام؟",
-            options: ["بلال بن رباح", "عبدالله بن مسعود", "سعد بن أبي وقاص", "عمر بن الخطاب"],
-            correct: 0
-        }
-    ],
-    17: [ // اليوم 17 من رمضان
-        {
-            question: "ما هو الشهر الذي نزل فيه القرآن الكريم؟",
-            options: ["شعبان", "رجب", "رمضان", "ذو القعدة"],
-            correct: 2
-        },
-        {
-            question: "ما هي الليلة التي يُرجى أن تكون ليلة القدر؟",
-            options: ["منتصف رمضان", "أول ليلة من رمضان", "الليالي الوترية من العشر الأواخر", "ليلة 15 رمضان"],
-            correct: 2
-        }
-    ],
-    18: [ // اليوم 18 من رمضان
-        {
-            question: "ما هو الطعام الذي كان يفضله النبي ﷺ عند الإفطار؟",
-            options: ["الماء", "العسل", "التمر", "اللبن"],
-            correct: 2
-        },
-        {
-            question: "من هو الصحابي الذي جهر بالإسلام علناً في مكة؟",
-            options: ["عمر بن الخطاب", "حمزة بن عبدالمطلب", "عبدالله بن مسعود", "أبو بكر الصديق"],
-            correct: 2
-        }
-    ],
-    19: [ // اليوم 19 من رمضان
-        {
-            question: "متى تم فتح مكة؟",
-            options: ["رمضان السنة السابعة للهجرة", "رمضان السنة الثامنة للهجرة", "رمضان السنة التاسعة للهجرة", "رمضان السنة العاشرة للهجرة"],
-            correct: 1
-        },
-        {
-            question: "من هو الصحابي الذي بشره النبي ﷺ بالجنة بسبب صيامه الدائم؟",
-            options: ["أبو بكر الصديق", "عبدالله بن عمرو بن العاص", "علي بن أبي طالب", "عثمان بن عفان"],
-            correct: 1
-        }
-    ],
-    20: [ // اليوم 20 من رمضان
-        {
-            question: "في أي سنة فرض الصيام على المسلمين؟",
-            options: ["السنة الثانية للهجرة", "السنة الأولى للهجرة", "السنة الثالثة للهجرة", "السنة الخامسة للهجرة"],
-            correct: 0
-        },
-        {
-            question: "من هو الصحابي الذي نام في فراش النبي ﷺ ليلة الهجرة؟",
-            options: ["عمر بن الخطاب", "علي بن أبي طالب", "عبدالله بن مسعود", "أبو بكر الصديق"],
-            correct: 1
-        }
-    ],
-    21: [ // اليوم 21 من رمضان
-        {
-            question: "ما هي السورة التي تسمى بعروس القرآن؟",
-            options: ["سورة الرحمن", "سورة الملك", "سورة البقرة", "سورة يس"],
-            correct: 0
-        },
-const ramadanQuestions = {
-    15: [ // اليوم 15 من رمضان
-        {
-            question: "ما هي السورة التي نزلت في ليلة النصف من رمضان؟",
-            options: ["سورة الدخان", "سورة القدر", "سورة البقرة", "سورة يس"],
-            correct: 0
-        },
-        {
-            question: "كم عدد الركعات في صلاة التراويح التي كان يصليها النبي ﷺ؟",
-            options: ["8 ركعات", "11 ركعة", "20 ركعة", "23 ركعة"],
-            correct: 1
-        },
-        {
-            question: "ما هو دعاء النصف من رمضان المأثور؟",
-            options: [
-                "اللهم اغفر لي ذنوبي",
-                "اللهم إنك عفو تحب العفو فاعف عني",
-                "اللهم بلغنا رمضان",
-                "اللهم تقبل منا صيامنا"
-            ],
-            correct: 1
-        },
-        {
-            question: "ما هي العبادة التي تُستحب في النصف الثاني من رمضان؟",
-            options: [
-                "الاعتكاف",
-                "صيام النوافل",
-                "صلاة الضحى",
-                "قيام الليل"
-            ],
-            correct: 0
-        },
-        {
-            question: "كم مرة ختم النبي ﷺ القرآن في رمضان مع جبريل عليه السلام؟",
-            options: ["مرة واحدة", "مرتين", "ثلاث مرات", "أربع مرات"],
-            correct: 1
-        }
-    ],
-    16: [ // اليوم 16 من رمضان
-        {
-            question: "متى كانت غزوة بدر الكبرى؟",
-            options: ["17 رمضان السنة الثانية للهجرة", "15 رمضان السنة الثالثة للهجرة", "20 رمضان السنة الأولى للهجرة", "10 رمضان السنة الرابعة للهجرة"],
-            correct: 0
-        },
-        {
-            question: "من هو الصحابي الذي كان أول مؤذن في الإسلام؟",
-            options: ["بلال بن رباح", "عبدالله بن مسعود", "سعد بن أبي وقاص", "عمر بن الخطاب"],
-            correct: 0
-        },
-        {
-            question: "ما هي الصلاة التي تؤدى بعد صلاة العشاء في رمضان؟",
-            options: ["قيام الليل", "التهجد", "التراويح", "الوتر"],
-            correct: 2
-        },
-        {
-            question: "ما هي أول غزوة قادها النبي ﷺ بنفسه؟",
-            options: ["غزوة الخندق", "غزوة بدر", "غزوة أحد", "غزوة تبوك"],
-            correct: 1
-        },
-        {
-            question: "من هو الصحابي الذي اشتهر بلقب «الفاروق»؟",
-            options: ["علي بن أبي طالب", "عمر بن الخطاب", "عثمان بن عفان", "أبو بكر الصديق"],
-            correct: 1
-        }
-    ],
-    17: [ // اليوم 17 من رمضان
-        {
-            question: "ما هو الشهر الذي نزل فيه القرآن الكريم؟",
-            options: ["شعبان", "رجب", "رمضان", "ذو القعدة"],
-            correct: 2
-        },
-        {
-            question: "ما هي الليلة التي يُرجى أن تكون ليلة القدر؟",
-            options: ["منتصف رمضان", "أول ليلة من رمضان", "الليالي الوترية من العشر الأواخر", "ليلة 15 رمضان"],
-            correct: 2
-        },
-        {
-            question: "من هو الصحابي الذي أمره النبي ﷺ بالآذان في رمضان؟",
-            options: ["بلال بن رباح", "عبدالله بن أم مكتوم", "أبو هريرة", "عبدالله بن مسعود"],
-            correct: 0
-        },
-        {
-            question: "كم مرة ذكر اسم رمضان في القرآن الكريم؟",
-            options: ["مرة واحدة", "مرتين", "ثلاث مرات", "أربع مرات"],
-            correct: 0
-        },
-        {
-            question: "متى كانت الهجرة النبوية؟",
-            options: ["السنة العاشرة للبعثة", "السنة الثانية للبعثة", "السنة الثالثة عشرة للبعثة", "السنة الخامسة للبعثة"],
-            correct: 2
-        }
-    ],
-    18: [ // اليوم 18 من رمضان
-        {
-            question: "من هو أول من صام في الإسلام؟",
-            options: ["آدم عليه السلام", "موسى عليه السلام", "نوح عليه السلام", "النبي ﷺ"],
-            correct: 0
-        },
-        {
-            question: "ما هو الطعام الذي كان يفضله النبي ﷺ عند الإفطار؟",
-            options: ["الماء", "العسل", "التمر", "اللبن"],
-            correct: 2
-        },
-        {
-            question: "كم سنة صامها النبي ﷺ في حياته؟",
-            options: ["8 سنوات", "9 سنوات", "10 سنوات", "12 سنة"],
-            correct: 1
-        },
-        {
-            question: "من هو الصحابي الذي جهر بالإسلام علناً في مكة؟",
-            options: ["عمر بن الخطاب", "حمزة بن عبدالمطلب", "عبدالله بن مسعود", "أبو بكر الصديق"],
-            correct: 2
-        },
-        {
-            question: "ما هي الصلاة التي يؤديها المسلم في العشر الأواخر من رمضان؟",
-            options: ["التراويح", "التهجد", "قيام الليل", "الشفع والوتر"],
-            correct: 1
-        }
-    ],
-    19: [ // اليوم 19 من رمضان
-        {
-            question: "متى تم فتح مكة؟",
-            options: ["رمضان السنة السابعة للهجرة", "رمضان السنة الثامنة للهجرة", "رمضان السنة التاسعة للهجرة", "رمضان السنة العاشرة للهجرة"],
-            correct: 1
-        },
-        {
-            question: "من هو الصحابي الذي بشره النبي ﷺ بالجنة بسبب صيامه الدائم؟",
-            options: ["أبو بكر الصديق", "عبدالله بن عمرو بن العاص", "علي بن أبي طالب", "عثمان بن عفان"],
-            correct: 1
-        },
-        {
-            question: "ما هو أول عمل قام به النبي ﷺ عند وصوله إلى المدينة؟",
-            options: ["إقامة السوق", "عقد وثيقة المدينة", "إرسال السرايا", "بناء المسجد"],
-            correct: 3
-        },
-        {
-            question: "ما اسم أم المؤمنين التي توفيت في رمضان؟",
-            options: ["حفصة بنت عمر", "زينب بنت خزيمة", "أم سلمة", "عائشة بنت أبي بكر"],
-            correct: 1
-        },
-        {
-            question: "متى وقعت معركة عين جالوت التي انتصر فيها المسلمون على التتار؟",
-            options: ["رمضان 900 هـ", "رمضان 658 هـ", "رمضان 700 هـ", "رمضان 500 هـ"],
-            correct: 1
-        }
-    ],
-    20: [ // اليوم 20 من رمضان
-        {
-            question: "في أي سنة فرض الصيام على المسلمين؟",
-            options: ["السنة الثانية للهجرة", "السنة الأولى للهجرة", "السنة الثالثة للهجرة", "السنة الخامسة للهجرة"],
-            correct: 0
-        },
-        {
-            question: "من هو الصحابي الذي نام في فراش النبي ﷺ ليلة الهجرة؟",
-            options: ["عمر بن الخطاب", "علي بن أبي طالب", "عبدالله بن مسعود", "أبو بكر الصديق"],
-            correct: 1
-        },
-        {
-            question: "ماذا كان يفعل النبي ﷺ في العشر الأواخر من رمضان؟",
-            options: ["يكثر من الصدقة", "يعتكف في المسجد", "يصلي التهجد", "يصوم عن الكلام"],
-            correct: 1
-        },
-        {
-            question: "ما هو أول بيت وضع للناس لعبادة الله؟",
-            options: ["المسجد النبوي", "الكعبة المشرفة", "بيت المقدس", "مسجد قباء"],
-            correct: 1
-        },
-        {
-            question: "كم كان عمر النبي ﷺ عند وفاته؟",
-            options: ["60 سنة", "61 سنة", "62 سنة", "63 سنة"],
-            correct: 3
-        }
-    ],
-    21: [ // اليوم 21 من رمضان
-        {
-            question: "ما هي السورة التي تسمى بعروس القرآن؟",
-            options: ["سورة الرحمن", "سورة الملك", "سورة البقرة", "سورة يس"],
-            correct: 0
-        },
-        {
-            question: "أي ليلة من العشر الأواخر يرجح أن تكون ليلة القدر؟",
-            options: ["ليلة 25", "ليلة 21", "ليلة 27", "ليلة 29"],
-            correct: 2
-        },
-        {
-            question: "من هو الصحابي الذي دعا له النبي ﷺ بأن يكون صوته في الميزان أثقل من جبل أحد؟",
-            options: ["أبو هريرة", "عبدالله بن مسعود", "سعد بن أبي وقاص", "بلال بن رباح"],
-            correct: 3
-        },
-        {
-            question: "ما هو عدد الأنبياء الذين ذكروا في القرآن؟",
-            options: ["18", "20", "25", "30"],
-            correct: 2
-        },
-        {
-            question: "ما هو الاسم الثاني لغزوة بدر؟",
-            options: ["غزوة الفرقان", "غزوة النصر", "غزوة الأحزاب", "غزوة الفتح"],
-            correct: 0
-        }
-    ],
-    22: [ // اليوم 22 من رمضان
-        {
-            question: "كم سنة استمرت دعوة النبي ﷺ في مكة قبل الهجرة؟",
-            options: ["10 سنوات", "11 سنة", "12 سنة", "13 سنة"],
-            correct: 3
-        },
-        {
-            question: "ما هو عدد أبواب الجنة؟",
-            options: ["6", "7", "8", "9"],
-            correct: 2
-        },
-        {
-            question: "من هو النبي الذي ابتلعه الحوت؟",
-            options: ["إبراهيم", "يونس", "موسى", "نوح"],
-            correct: 1
-        },
-        {
-            question: "من هو أول الخلفاء الراشدين؟",
-            options: ["علي بن أبي طالب", "عمر بن الخطاب", "أبو بكر الصديق", "عثمان بن عفان"],
-            correct: 2
-        },
-        {
-            question: "أي سورة في القرآن تسمى بقلب القرآن؟",
-            options: ["سورة الفاتحة", "سورة يس", "سورة الإخلاص", "سورة الكهف"],
-            correct: 1
-        }
-    ],
-    23: [ // اليوم 23 من رمضان
-        {
-            question: "من هو النبي الذي رفع إليه القرآن كاملاً في ليلة القدر؟",
-            options: ["موسى", "إبراهيم", "محمد", "عيسى"],
-            correct: 2
-        },
-        {
-            question: "أي مدينة تُعرف باسم بلد المئة مئذنة؟",
-            options: ["القاهرة", "إسطنبول", "دمشق", "مكة"],
-            correct: 1
-        },
-        {
-            question: "كم عدد السنين التي قضاها النبي ﷺ في المدينة بعد الهجرة؟",
-            options: ["8 سنوات", "9 سنوات", "10 سنوات", "11 سنة"],
-            correct: 2
-        },
-        {
-            question: "من هو الصحابي الذي حمل رسالة الإسلام إلى كسرى ملك الفرس؟",
-            options: ["عبدالله بن حذافة", "خالد بن الوليد", "المغيرة بن شعبة", "سعد بن أبي وقاص"],
-            correct: 0
-        },
-        {
-            question: "ما هو الاسم الذي يطلق على أول 10 أيام من رمضان؟",
-            options: ["أيام الغفران", "أيام الرحمة", "أيام العتق من النار", "أيام المغفرة"],
-            correct: 1
-        }
-    ],
-    24: [ // اليوم 24 من رمضان
-        {
-            question: "من هو النبي الذي كلمه الله مباشرة؟",
-            options: ["موسى", "عيسى", "إبراهيم", "محمد"],
-            correct: 0
-        },
-        {
-            question: "ما هو عدد الأجزاء التي يتكون منها القرآن الكريم؟",
-            options: ["30", "29", "28", "31"],
-            correct: 0
-        },
-        {
-            question: "ما هو الدعاء الذي كان النبي ﷺ يكثر منه في العشر الأواخر؟",
-            options: [
-                "اللهم إنك عفو تحب العفو فاعف عني",
-                "رب اغفر لي ولوالدي",
-                "اللهم اجعلني من المتقين",
-                "اللهم إني أسألك الجنة"
-            ],
-            correct: 0
-        },
-        {
-            question: "من هو الصحابي الذي كان يلقب بسيف الله المسلول؟",
-            options: ["خالد بن الوليد", "عمر بن الخطاب", "علي بن أبي طالب", "حمزة بن عبدالمطلب"],
-            correct: 0
-        },
-        {
-            question: "ما هو أطول نهر في العالم؟",
-            options: ["نهر الأمازون", "نهر النيل", "نهر المسيسيبي", "نهر الفرات"],
-            correct: 1
-        }
-    ],
-    25: [ // اليوم 25 من رمضان
-        {
-            question: "من هو الصحابي الذي أشار بحفر الخندق في غزوة الأحزاب؟",
-            options: ["عمر بن الخطاب", "سلمان الفارسي", "أبو عبيدة بن الجراح", "علي بن أبي طالب"],
-            correct: 1
-        },
-        {
-            question: "ما هو أول جبل وُضع في الأرض؟",
-            options: ["جبل النور", "جبل أحد", "جبل عرفات", "جبل أبي قبيس"],
-            correct: 3
-        },
-        {
-            question: "ما اسم أم النبي ﷺ؟",
-            options: ["أم حبيبة", "أمنة بنت وهب", "حليمة السعدية", "خديجة بنت خويلد"],
-            correct: 1
-        },
-        {
-            question: "كم عدد الغزوات التي قادها النبي ﷺ بنفسه؟",
-            options: ["15", "27", "20", "25"],
-            correct: 1
-        },
-        {
-            question: "ما هي السورة التي تعادل ثلث القرآن؟",
-            options: ["سورة الفاتحة", "سورة الإخلاص", "سورة الملك", "سورة الكافرون"],
-            correct: 1
-        }
-    ],
-    26: [ // اليوم 26 من رمضان
-        {
-            question: "من هو الصحابي الذي كان أول سفير في الإسلام؟",
-            options: ["عبدالله بن مسعود", "مصعب بن عمير", "بلال بن رباح", "زيد بن ثابت"],
-            correct: 1
-        },
-        {
-            question: "كم مرة ورد ذكر اسم (محمد) في القرآن؟",
-            options: ["3 مرات", "4 مرات", "5 مرات", "6 مرات"],
-            correct: 1
-        },
-        {
-            question: "ما هي أول آية نزلت من القرآن الكريم؟",
-            options: ["الرحمن علم القرآن", "إنا أنزلناه في ليلة القدر", "اقرأ باسم ربك الذي خلق", "والعصر إن الإنسان لفي خسر"],
-            correct: 2
-        },
-        {
-            question: "ما هو عدد السور التي تبدأ بـ (الحمد لله)؟",
-            options: ["4", "5", "6", "3"],
-            correct: 1
-        },
-        {
-            question: "من هو النبي الذي آمن به جميع قومه؟",
-            options: ["موسى", "يونس", "إبراهيم", "شعيب"],
-            correct: 1
-        }
-    ],
-    27: [ // اليوم 27 من رمضان
-        {
-            question: "ما هو الشهر الذي ولد فيه النبي ﷺ؟",
-            options: ["رجب", "محرم", "ربيع الأول", "ذو الحجة"],
-            correct: 2
-        },
-        {
-            question: "ما هي الغزوة التي سميت بفتح الفتوح؟",
-            options: ["غزوة بدر", "غزوة خيبر", "غزوة اليرموك", "غزوة مكة"],
-            correct: 2
-        },
-        {
-            question: "من هو الصحابي الذي لقب بـ 'ترجمان القرآن'؟",
-            options: ["عبدالله بن مسعود", "عبدالله بن عباس", "زيد بن ثابت", "أبو هريرة"],
-            correct: 1
-        },
-        {
-            question: "كم عدد كلمات القرآن الكريم؟",
-            options: ["77,439", "77,798", "78,476", "76,255"],
-            correct: 1
-        },
-        {
-            question: "متى كانت حجة الوداع؟",
-            options: ["السنة 8 هـ", "السنة 9 هـ", "السنة 10 هـ", "السنة 11 هـ"],
-            correct: 2
-        }
-    ],
-    28: [ // اليوم 28 من رمضان
-        {
-            question: "ما هو الاسم الآخر لليلة القدر؟",
-            options: ["ليلة البركة", "ليلة الفرقان", "ليلة الرحمة", "ليلة النور"],
-            correct: 0
-        },
-        {
-            question: "كم مرة ورد ذكر الحج في القرآن الكريم؟",
-            options: ["5 مرات", "6 مرات", "7 مرات", "8 مرات"],
-            correct: 1
-        },
-        {
-            question: "ما هو المسجد الذي أسس على التقوى؟",
-            options: ["المسجد النبوي", "المسجد الحرام", "مسجد قباء", "المسجد الأقصى"],
-            correct: 2
-        },
-        {
-            question: "ما هي السورة التي كانت سببًا في إسلام عمر بن الخطاب؟",
-            options: ["سورة الفتح", "سورة يس", "سورة طه", "سورة النجم"],
-            correct: 2
-        },
-        {
-            question: "كم عدد سنوات نزول القرآن الكريم؟",
-            options: ["20 سنة", "21 سنة", "22 سنة", "23 سنة"],
-            correct: 3
-        }
-    ],
-    29: [ // اليوم 29 من رمضان
-        {
-            question: "من هو الصحابي الذي كان مستجاب الدعوة؟",
-            options: ["سعد بن أبي وقاص", "عمر بن الخطاب", "أبو عبيدة بن الجراح", "عبدالله بن الزبير"],
-            correct: 0
-        },
-        {
-            question: "كم عدد سور القرآن الكريم؟",
-            options: ["112", "113", "114", "115"],
-            correct: 2
-        },
-        {
-            question: "من هو النبي الذي سُمي 'ذو النون'؟",
-            options: ["يونس", "إلياس", "إدريس", "إبراهيم"],
-            correct: 0
-        },
-        {
-            question: "ما هي السورة التي لا تبدأ بالبسملة؟",
-            options: ["سورة التوبة", "سورة الفيل", "سورة الناس", "سورة مريم"],
-            correct: 0
-        },
-        {
-            question: "ما هو العام الذي وُلد فيه النبي ﷺ؟",
-            options: ["عام الفيل", "عام الحزن", "عام الوفود", "عام الفتح"],
-            correct: 0
-        }
-    ]
-};
-        {
-            question: "أي ليلة من العشر الأواخر يرجح أن تكون ليلة القدر؟",
-            options: ["ليلة 25", "ليلة 21", "ليلة 27", "ليلة 29"],
-            correct: 2
-        }
-    ],
-    22: [ // اليوم 22 من رمضان
-        {
-            question: "من هو النبي الذي ابتلعه الحوت؟",
-            options: ["إبراهيم", "يونس", "موسى", "نوح"],
-            correct: 1
-        },
-        {
-            question: "من هو أول الخلفاء الراشدين؟",
-            options: ["علي بن أبي طالب", "عمر بن الخطاب", "أبو بكر الصديق", "عثمان بن عفان"],
-            correct: 2
-        }
-    ],
-    23: [ // اليوم 23 من رمضان
-        {
-            question: "من هو النبي الذي رفع إليه القرآن كاملاً في ليلة القدر؟",
-            options: ["موسى", "إبراهيم", "محمد", "عيسى"],
-            correct: 2
-        },
-        {
-
-
-// تعديل دالة initializeQuiz لتحديد اليوم وجلب الأسئلة المناسبة
-async function initializeQuiz() {
-    try {
-        updateDateTime();
-        const isQuizTime = checkQuizTime();
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فوازير رمضان 1446</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
         
-        // تحديد اليوم الحالي من رمضان (15 في هذه الحالة)
-        const currentRamadanDay = 15; // يمكنك تعديل هذا حسب التاريخ الفعلي
-        
-        // التحقق من وجود أسئلة لليوم الحالي
-        if (!ramadanQuestions[currentRamadanDay]) {
-            console.error('لا توجد أسئلة لهذا اليوم');
-            alert('عذراً، لا توجد أسئلة متاحة لهذا اليوم');
-            return;
+        * {
+            font-family: 'Cairo', sans-serif;
         }
 
-        // تحديث بنك الأسئلة باستخدام أسئلة اليوم الحالي
-        questionBank = [...ramadanQuestions[currentRamadanDay]];
-        
-        if (!isQuizTime) {
-            elements.startScreen.classList.add('hidden');
-            elements.outOfTimeScreen.classList.remove('hidden');
-            updateTimeMessage();
-            setInterval(updateTimeMessage, 60000);
-            return;
+        @keyframes floatMoon {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
         }
 
-        elements.startScreen.classList.remove('hidden');
-    } catch (error) {
-        console.error('Error initializing quiz:', error);
-        alert('حدث خطأ في تحميل المسابقة. يرجى تحديث الصفحة.');
-    }
-}
+        .floating-moon {
+            animation: floatMoon 3s ease-in-out infinite;
+        }
 
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
 
+        .star {
+            position: absolute;
+            color: #FCD34D;
+            animation: twinkle 2s ease-in-out infinite;
+        }
 
+        .option-correct {
+            background-color: rgba(34, 197, 94, 0.2) !important;
+            border-color: rgb(34, 197, 94) !important;
+        }
 
-        
-          // حالة اللعبة
-          const gameState = {
-              playerName: "",
-              currentQuestion: 0,
-              score: 0,
-              answers: [],
-              timeLeft: 10,
-              timer: null,
-              questions: [],
-              questionStartTime: null,
-              questionTimes: [],
-              totalTime: 0,
-              isAnswered: false
-          };
+        .option-wrong {
+            background-color: rgba(239, 68, 68, 0.2) !important;
+            border-color: rgb(239, 68, 68) !important;
+        }
 
-          // العناصر
-          const elements = {
-              startScreen: document.getElementById('start-screen'),
-              quizScreen: document.getElementById('quiz-screen'),
-              resultsScreen: document.getElementById('results-screen'),
-              countdownScreen: document.getElementById('countdown-screen'),
-              playerNameInput: document.getElementById('player-name'),
-              startButton: document.getElementById('start-button'),
-              playerWelcome: document.getElementById('player-welcome'),
-              questionCounter: document.getElementById('question-counter'),
-              questionText: document.getElementById('question-text'),
-              optionsContainer: document.getElementById('options-container'),
-              timer: document.getElementById('timer'),
-              timerBar: document.getElementById('timer-bar'),
-              outOfTimeScreen: document.getElementById('out-of-time-screen'),
-              alreadyParticipatedScreen: document.getElementById('already-participated-screen')
-          };
+        .option-disabled {
+            pointer-events: none;
+            opacity: 0.7;
+        }
 
-          // دوال التحقق والتخزين المحلي
-          function simpleEncrypt(text) {
-              return btoa(text + '_' + new Date().toDateString());
-          }
+        @keyframes scaleNumber {
+            0% { transform: scale(1); opacity: 0; }
+            50% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
 
-          function checkLocalParticipation() {
-              const today = new Date().toDateString();
-              const participationKey = localStorage.getItem('lastParticipation');
-              if (!participationKey) return false;
-              
-              try {
-                  const decrypted = atob(participationKey).split('_')[1];
-                  return decrypted === today;
-              } catch {
-                  return false;
-              }
-          }
+        .countdown-number {
+            animation: scaleNumber 1s ease-out;
+        }
 
-          function recordLocalParticipation() {
-              const participationKey = simpleEncrypt('participated');
-              localStorage.setItem('lastParticipation', participationKey);
-          }
+        .countdown-text {
+            animation: fadeInUp 0.5s ease-out;
+        }
 
-          // التحقق من وقت المسابقة
-          function checkQuizTime() {
-              const now = new Date();
-              const hours = now.getHours();
-              return hours >= 19 && hours < 20; // من 7 مساءً حتى 8 مساءً
-          }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-blue-900 to-indigo-950 min-h-screen">
+    <!-- شريط التاريخ -->
+    <div class="bg-white/5 backdrop-blur-sm border-b border-white/10 p-3 text-white text-center">
+        <div class="max-w-3xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <span id="day-name" class="text-blue-400"></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="current-date" class="text-green-400"></span>
+            </div>
+        </div>
+    </div>
 
-          // تحديث رسالة الوقت
-          function updateTimeMessage() {
-              const now = new Date();
-              const nextQuiz = new Date();
-              nextQuiz.setHours(19, 0, 0, 0);
+    <!-- شاشة خارج وقت المسابقة -->
+    <div id="out-of-time-screen" class="hidden min-h-screen text-white flex items-center justify-center p-6">
+        <div class="max-w-md w-full">
+            <div class="bg-white/10 backdrop-blur-lg border-2 border-yellow-400/20 rounded-3xl p-8 text-center">
+                <i data-lucide="clock" class="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
+                <h2 class="text-2xl font-bold text-yellow-400 mb-4">المسابقة غير متاحة حالياً</h2>
+                <p class="text-gray-300 mb-4">المسابقة متاحة يومياً من الساعة 7 مساءً حتى 8 مساءً</p>
+                <div id="time-message" class="text-green-400 text-lg mb-8"></div>
+                <a href="leaderboard.html" class="inline-block bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-8 py-3 rounded-xl">
+                    عرض نتائج المتصدرين
+                </a>
+            </div>
+        </div>
+    </div>
 
-              if (now.getHours() >= 20) {
-                  nextQuiz.setDate(nextQuiz.getDate() + 1);
-              }
+    <!-- شاشة المشاركة السابقة -->
+    <div id="already-participated-screen" class="hidden min-h-screen text-white flex items-center justify-center p-6">
+        <div class="max-w-md w-full">
+            <div class="bg-white/10 backdrop-blur-lg border-2 border-red-400/20 rounded-3xl p-8 text-center">
+                <i data-lucide="alert-circle" class="w-16 h-16 mx-auto text-red-400 mb-4"></i>
+                <h2 class="text-2xl font-bold text-red-400 mb-4">لقد شاركت مسبقاً</h2>
+                <p class="text-gray-300 mb-6">يمكنك المشاركة مرة واحدة فقط في اليوم</p>
+                <a href="leaderboard.html" class="inline-block bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-8 py-3 rounded-xl">
+                    عرض نتائج المتصدرين
+                </a>
+            </div>
+        </div>
+    </div>
 
-              const timeUntilQuiz = nextQuiz - now;
-              const hours = Math.floor(timeUntilQuiz / (1000 * 60 * 60));
-              const minutes = Math.floor((timeUntilQuiz % (1000 * 60 * 60)) / (1000 * 60));
+    <!-- شاشة البداية -->
+    <div id="start-screen" class="hidden min-h-[calc(100vh-64px)] text-white flex items-center justify-center p-6">
+        <div class="max-w-md w-full">
+            <div class="bg-white/10 backdrop-blur-lg border-2 border-green-400/20 rounded-3xl p-8">
+                <div class="text-center space-y-6">
+                    <div class="relative h-32">
+                        <div class="floating-moon">
+                            <i data-lucide="moon" class="w-20 h-20 mx-auto text-yellow-400"></i>
+                        </div>
+                        <div class="absolute bottom-0 w-full">
+                            <i data-lucide="star" class="star w-4 h-4" style="left: calc(50% - 20px);"></i>
+                            <i data-lucide="star" class="star w-4 h-4" style="left: 50%;"></i>
+                            <i data-lucide="star" class="star w-4 h-4" style="left: calc(50% + 20px);"></i>
+                        </div>
+                    </div>
+                    <h1 class="text-3xl font-bold text-yellow-400">فوازير رمضان</h1>
+                    <div class="space-y-4">
+                        <label class="text-lg block text-center mb-2">
+                            أدخل اسمك للمشاركة في المسابقة
+                        </label>
+                        <input
+                            type="text"
+                            id="player-name"
+                            placeholder="الاسم الكريم"
+                            class="w-full bg-white/5 border-2 border-green-400/20 text-center text-lg py-6 rounded-xl text-white"
+                        >
+                    </div>
+                    <button
+                        id="start-button"
+                        class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-6 rounded-xl text-lg flex items-center justify-center gap-2"
+                        disabled
+                    >
+                        <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        بدء المسابقة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-              let message;
-              if (now.getHours() >= 19 && now.getHours() < 20) {
-                  message = "المسابقة متاحة الآن!";
-              } else if (now.getHours() >= 20) {
-                  message = `المسابقة القادمة غداً في تمام الساعة 7 مساءً (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
-              } else {
-                  message = `المسابقة ستبدأ اليوم في تمام الساعة 7 مساءً (متبقي ${hours} ساعة و ${minutes} دقيقة)`;
-              }
+    <!-- شاشة العد التنازلي -->
+    <div id="countdown-screen" class="fixed inset-0 bg-blue-900/95 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div id="countdown-number" class="text-8xl font-bold text-yellow-400 mb-4 countdown-number"></div>
+            <div id="countdown-text" class="text-2xl text-white countdown-text"></div>
+        </div>
+    </div>
 
-              document.getElementById('time-message').textContent = message;
-          }
+    <!-- شاشة الأسئلة -->
+    <div id="quiz-screen" class="min-h-screen text-white p-6 hidden">
+        <div class="max-w-3xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-yellow-400 mb-2">فوازير رمضان</h1>
+                <p id="player-welcome" class="text-lg text-green-400"></p>
+            </div>
+            <div class="bg-white/10 backdrop-blur-lg border-2 border-green-400/20 rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="clock" class="w-5 h-5"></i>
+                        <span id="timer" class="text-xl font-bold">10</span>
+                    </div>
+                    <div id="question-counter" class="text-lg"></div>
+                </div>
+                <div class="relative h-2 bg-gray-700/50 rounded-full overflow-hidden mb-6">
+                    <div id="timer-bar" class="absolute top-0 left-0 h-full bg-green-400 transition-all duration-1000"></div>
+                </div>
+                <h3 id="question-text" class="text-xl font-semibold mb-6 pr-4 border-r-4 border-green-400"></h3>
+                <div id="options-container" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
 
-          // تحديث التاريخ والوقت
-          function updateDateTime() {
-              const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-              const now = new Date();
-              const dayName = days[now.getDay()];
-              const date = now.toLocaleDateString('ar-SA');
-              
-              document.getElementById('day-name').textContent = dayName;
-              document.getElementById('current-date').textContent = date;
-          }
+    <!-- شاشة النتائج -->
+    <div id="results-screen" class="min-h-screen text-white p-6 hidden">
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white/10 backdrop-blur-lg border-2 border-yellow-400/30 rounded-2xl p-8">
+                <i data-lucide="trophy" class="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
+                <h3 class="text-2xl font-bold text-yellow-400 mb-4 text-center">النتيجة النهائية</h3>
+                <p id="final-name" class="text-xl mb-4 text-center"></p>
+                <p id="final-score" class="text-xl mb-6 text-center"></p>
+                <div id="answers-review" class="space-y-4 mt-8"></div>
+                <div class="flex gap-4 mt-6">
+                    <button onclick="location.reload()" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl text-lg">
+                        حاول مرة أخرى
+                    </button>
+                    <button onclick="window.location.href='leaderboard.html'" class="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white py-4 rounded-xl text-lg">
+                        قائمة المتصدرين
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div> 
+    <script>
+        // تهيئة Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyC5RYK1lGaJaMQJmOH85cqNgv6m7rbLS_A",
+            authDomain: "ramadanmotaz-5570f.firebaseapp.com",
+            projectId: "ramadanmotaz-5570f",
+            storageBucket: "ramadanmotaz-5570f.appspot.com",
+            messagingSenderId: "595667154066",
+            appId: "1:595667154066:web:80ba616566ec55a5efe24b"
+        };
 
-          // بدء العد التنازلي
-          function startCountdown() {
-              const countdownMessages = [
-                  { number: 5, text: "استعد التحدي سيبدأ! 🔥" },
-                  { number: 4, text: "ركّز، الفرصة أمامك! 🚀" },
-                  { number: 3, text: "لحظات للحسم، لا تتردد! ⚡️" },
-                  { number: 2, text: "كن الأسرع، كن الأذكى! 🏆" },
-                  { number: 1, text: "الآن… أطلق إبداعك! 🎯" }
-              ];
+        let db;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.error('Error initializing Firebase:', error);
+        }
 
-              let currentIndex = 0;
-              elements.countdownScreen.classList.remove('hidden');
-              
-              function updateCountdown() {
-                  if (currentIndex >= countdownMessages.length) {
-                      elements.countdownScreen.classList.add('hidden');
-                      showQuestion();
-                      return;
-                  }
+        // بنك الأسئلة
+        const ramadanQuestions = {
+            15: [ // اليوم 15 من رمضان
+                {
+                    question: "ما هي السورة التي نزلت في ليلة النصف من رمضان؟",
+                    options: ["سورة الدخان", "سورة القدر", "سورة البقرة", "سورة يس"],
+                    correct: 0
+                },
+                {
+                    question: "كم عدد الركعات في صلاة التراويح التي كان يصليها النبي ﷺ؟",
+                    options: ["8 ركعات", "11 ركعة", "20 ركعة", "23 ركعة"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو دعاء النصف من رمضان المأثور؟",
+                    options: [
+                        "اللهم اغفر لي ذنوبي",
+                        "اللهم إنك عفو تحب العفو فاعف عني",
+                        "اللهم بلغنا رمضان",
+                        "اللهم تقبل منا صيامنا"
+                    ],
+                    correct: 1
+                },
+                {
+                    question: "ما هي العبادة التي تُستحب في النصف الثاني من رمضان؟",
+                    options: [
+                        "الاعتكاف",
+                        "صيام النوافل",
+                        "صلاة الضحى",
+                        "قيام الليل"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "كم مرة ختم النبي ﷺ القرآن في رمضان مع جبريل عليه السلام؟",
+                    options: ["مرة واحدة", "مرتين", "ثلاث مرات", "أربع مرات"],
+                    correct: 1
+                }
+            ],
+            16: [ // اليوم 16 من رمضان
+                {
+                    question: "متى كانت غزوة بدر الكبرى؟",
+                    options: ["17 رمضان السنة الثانية للهجرة", "15 رمضان السنة الثالثة للهجرة", "20 رمضان السنة الأولى للهجرة", "10 رمضان السنة الرابعة للهجرة"],
+                    correct: 0
+                },
+                {
+                    question: "من هو الصحابي الذي كان أول مؤذن في الإسلام؟",
+                    options: ["بلال بن رباح", "عبدالله بن مسعود", "سعد بن أبي وقاص", "عمر بن الخطاب"],
+                    correct: 0
+                },
+                {
+                    question: "ما هي الصلاة التي تؤدى بعد صلاة العشاء في رمضان؟",
+                    options: ["قيام الليل", "التهجد", "التراويح", "الوتر"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي أول غزوة قادها النبي ﷺ بنفسه؟",
+                    options: ["غزوة الخندق", "غزوة بدر", "غزوة أحد", "غزوة تبوك"],
+                    correct: 1
+                },
+                {
+                    question: "من هو الصحابي الذي اشتهر بلقب «الفاروق»؟",
+                    options: ["علي بن أبي طالب", "عمر بن الخطاب", "عثمان بن عفان", "أبو بكر الصديق"],
+                    correct: 1
+                }
+            ],
+            17: [ // اليوم 17 من رمضان
+                {
+                    question: "ما هو الشهر الذي نزل فيه القرآن الكريم؟",
+                    options: ["شعبان", "رجب", "رمضان", "ذو القعدة"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي الليلة التي يُرجى أن تكون ليلة القدر؟",
+                    options: ["منتصف رمضان", "أول ليلة من رمضان", "الليالي الوترية من العشر الأواخر", "ليلة 15 رمضان"],
+                    correct: 2
+                },
+                {
+                    question: "من هو الصحابي الذي أمره النبي ﷺ بالآذان في رمضان؟",
+                    options: ["بلال بن رباح", "عبدالله بن أم مكتوم", "أبو هريرة", "عبدالله بن مسعود"],
+                    correct: 0
+                },
+                {
+                    question: "كم مرة ذكر اسم رمضان في القرآن الكريم؟",
+                    options: ["مرة واحدة", "مرتين", "ثلاث مرات", "أربع مرات"],
+                    correct: 0
+                },
+                {
+                    question: "متى كانت الهجرة النبوية؟",
+                    options: ["السنة العاشرة للبعثة", "السنة الثانية للبعثة", "السنة الثالثة عشرة للبعثة", "السنة الخامسة للبعثة"],
+                    correct: 2
+                }
+            ],
+            18: [ // اليوم 18 من رمضان
+                {
+                    question: "من هو أول من صام في الإسلام؟",
+                    options: ["آدم عليه السلام", "موسى عليه السلام", "نوح عليه السلام", "النبي ﷺ"],
+                    correct: 0
+                },
+                {
+                    question: "ما هو الطعام الذي كان يفضله النبي ﷺ عند الإفطار؟",
+                    options: ["الماء", "العسل", "التمر", "اللبن"],
+                    correct: 2
+                },
+                {
+                    question: "كم سنة صامها النبي ﷺ في حياته؟",
+                    options: ["8 سنوات", "9 سنوات", "10 سنوات", "12 سنة"],
+                    correct: 1
+                },
+                {
+                    question: "من هو الصحابي الذي جهر بالإسلام علناً في مكة؟",
+                    options: ["عمر بن الخطاب", "حمزة بن عبدالمطلب", "عبدالله بن مسعود", "أبو بكر الصديق"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي الصلاة التي يؤديها المسلم في العشر الأواخر من رمضان؟",
+                    options: ["التراويح", "التهجد", "قيام الليل", "الشفع والوتر"],
+                    correct: 1
+                }
+            ],
+            19: [ // اليوم 19 من رمضان
+                {
+                    question: "متى تم فتح مكة؟",
+                    options: ["رمضان السنة السابعة للهجرة", "رمضان السنة الثامنة للهجرة", "رمضان السنة التاسعة للهجرة", "رمضان السنة العاشرة للهجرة"],
+                    correct: 1
+                },
+                {
+                    question: "من هو الصحابي الذي بشره النبي ﷺ بالجنة بسبب صيامه الدائم؟",
+                    options: ["أبو بكر الصديق", "عبدالله بن عمرو بن العاص", "علي بن أبي طالب", "عثمان بن عفان"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو أول عمل قام به النبي ﷺ عند وصوله إلى المدينة؟",
+                    options: ["إقامة السوق", "عقد وثيقة المدينة", "إرسال السرايا", "بناء المسجد"],
+                    correct: 3
+                },
+                {
+                    question: "ما اسم أم المؤمنين التي توفيت في رمضان؟",
+                    options: ["حفصة بنت عمر", "زينب بنت خزيمة", "أم سلمة", "عائشة بنت أبي بكر"],
+                    correct: 1
+                },
+                {
+                    question: "متى وقعت معركة عين جالوت التي انتصر فيها المسلمون على التتار؟",
+                    options: ["رمضان 900 هـ", "رمضان 658 هـ", "رمضان 700 هـ", "رمضان 500 هـ"],
+                    correct: 1
+                }
+            ],
+            20: [ // اليوم 20 من رمضان
+                {
+                    question: "في أي سنة فرض الصيام على المسلمين؟",
+                    options: ["السنة الثانية للهجرة", "السنة الأولى للهجرة", "السنة الثالثة للهجرة", "السنة الخامسة للهجرة"],
+                    correct: 0
+                },
+                {
+                    question: "من هو الصحابي الذي نام في فراش النبي ﷺ ليلة الهجرة؟",
+                    options: ["عمر بن الخطاب", "علي بن أبي طالب", "عبدالله بن مسعود", "أبو بكر الصديق"],
+                    correct: 1
+                },
+                {
+                    question: "ماذا كان يفعل النبي ﷺ في العشر الأواخر من رمضان؟",
+                    options: ["يكثر من الصدقة", "يعتكف في المسجد", "يصلي التهجد", "يصوم عن الكلام"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو أول بيت وضع للناس لعبادة الله؟",
+                    options: ["المسجد النبوي", "الكعبة المشرفة", "بيت المقدس", "مسجد قباء"],
+                    correct: 1
+                },
+                {
+                    question: "كم كان عمر النبي ﷺ عند وفاته؟",
+                    options: ["60 سنة", "61 سنة", "62 سنة", "63 سنة"],
+                    correct: 3
+                }
+            ],
+            21: [ // اليوم 21 من رمضان
+                {
+                    question: "ما هي السورة التي تسمى بعروس القرآن؟",
+                    options: ["سورة الرحمن", "سورة الملك", "سورة البقرة", "سورة يس"],
+                    correct: 0
+                },
+                {
+                    question: "أي ليلة من العشر الأواخر يرجح أن تكون ليلة القدر؟",
+                    options: ["ليلة 25", "ليلة 21", "ليلة 27", "ليلة 29"],
+                    correct: 2
+                },
+                {
+                    question: "من هو الصحابي الذي دعا له النبي ﷺ بأن يكون صوته في الميزان أثقل من جبل أحد؟",
+                    options: ["أبو هريرة", "عبدالله بن مسعود", "سعد بن أبي وقاص", "بلال بن رباح"],
+                    correct: 3
+                },
+                {
+                    question: "ما هو عدد الأنبياء الذين ذكروا في القرآن؟",
+                    options: ["18", "20", "25", "30"],
+                    correct: 2
+                },
+                {
+                    question: "ما هو الاسم الثاني لغزوة بدر؟",
+                    options: ["غزوة الفرقان", "غزوة النصر", "غزوة الأحزاب", "غزوة الفتح"],
+                    correct: 0
+                }
+            ],
+            22: [ // اليوم 22 من رمضان
+                {
+                    question: "كم سنة استمرت دعوة النبي ﷺ في مكة قبل الهجرة؟",
+                    options: ["10 سنوات", "11 سنة", "12 سنة", "13 سنة"],
+                    correct: 3
+                },
+                {
+                    question: "ما هو عدد أبواب الجنة؟",
+                    options: ["6", "7", "8", "9"],
+                    correct: 2
+                },
+                {
+                    question: "من هو النبي الذي ابتلعه الحوت؟",
+                    options: ["إبراهيم", "يونس", "موسى", "نوح"],
+                    correct: 1
+                },
+                {
+                    question: "من هو أول الخلفاء الراشدين؟",
+                    options: ["علي بن أبي طالب", "عمر بن الخطاب", "أبو بكر الصديق", "عثمان بن عفان"],
+                    correct: 2
+                },
+                {
+                    question: "أي سورة في القرآن تسمى بقلب القرآن؟",
+                    options: ["سورة الفاتحة", "سورة يس", "سورة الإخلاص", "سورة الكهف"],
+                    correct: 1
+                }
+            ],
+            23: [ // اليوم 23 من رمضان
+                {
+                    question: "من هو النبي الذي رفع إليه القرآن كاملاً في ليلة القدر؟",
+                    options: ["موسى", "إبراهيم", "محمد", "عيسى"],
+                    correct: 2
+                },
+                {
+                    question: "أي مدينة تُعرف باسم بلد المئة مئذنة؟",
+                    options: ["القاهرة", "إسطنبول", "دمشق", "مكة"],
+                    correct: 1
+                },
+                {
+                    question: "كم عدد السنين التي قضاها النبي ﷺ في المدينة بعد الهجرة؟",
+                    options: ["8 سنوات", "9 سنوات", "10 سنوات", "11 سنة"],
+                    correct: 2
+                },
+                {
+                                        question: "من هو الصحابي الذي لقب بـ «أمين الأمة»؟",
+                    options: ["أبو هريرة", "أبو عبيدة بن الجراح", "معاذ بن جبل", "زيد بن ثابت"],
+                    correct: 1
+                },
+                {
+                    question: "ما هي السورة التي تعدل ثلث القرآن؟",
+                    options: ["سورة الإخلاص", "سورة الكوثر", "سورة الفاتحة", "سورة العصر"],
+                    correct: 0
+                }
+            ],
+            24: [ // اليوم 24 من رمضان
+                {
+                    question: "من هو الصحابي الذي كان يلقب بـ «ذو النورين»؟",
+                    options: ["عثمان بن عفان", "علي بن أبي طالب", "عمر بن الخطاب", "أبو بكر الصديق"],
+                    correct: 0
+                },
+                {
+                    question: "ما هو أول مسجد بني في الإسلام؟",
+                    options: ["المسجد النبوي", "المسجد الحرام", "مسجد قباء", "مسجد الأقصى"],
+                    correct: 2
+                },
+                {
+                    question: "كم عدد ركعات صلاة الوتر؟",
+                    options: ["ركعة واحدة", "ثلاث ركعات", "خمس ركعات", "سبع ركعات"],
+                    correct: 0
+                },
+                {
+                    question: "من هو أول من جمع القرآن الكريم في مصحف واحد؟",
+                    options: ["عمر بن الخطاب", "علي بن أبي طالب", "أبو بكر الصديق", "عثمان بن عفان"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي السورة التي تسمى بسنام القرآن؟",
+                    options: ["سورة البقرة", "سورة آل عمران", "سورة الفاتحة", "سورة الرحمن"],
+                    correct: 0
+                }
+            ],
+            25: [ // اليوم 25 من رمضان
+                {
+                    question: "من هو آخر الأنبياء والرسل؟",
+                    options: ["عيسى عليه السلام", "محمد ﷺ", "موسى عليه السلام", "إبراهيم عليه السلام"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو الدعاء المستحب في ليلة القدر؟",
+                    options: [
+                        "اللهم إنك عفو تحب العفو فاعف عني",
+                        "اللهم اغفر لي ذنوبي",
+                        "اللهم بارك لي في رمضان",
+                        "اللهم تقبل صيامي وقيامي"
+                    ],
+                    correct: 0
+                },
+                {
+                    question: "ما هي السورة التي نزلت كاملة مرة واحدة؟",
+                    options: ["سورة الفاتحة", "سورة الإخلاص", "سورة الأنعام", "سورة يوسف"],
+                    correct: 2
+                },
+                {
+                    question: "من هو النبي الذي أعطاه الله معجزة إحياء الموتى؟",
+                    options: ["موسى عليه السلام", "إبراهيم عليه السلام", "عيسى عليه السلام", "محمد ﷺ"],
+                    correct: 2
+                },
+                {
+                    question: "ما هو الركن الخامس من أركان الإسلام؟",
+                    options: ["الصلاة", "الزكاة", "الصوم", "الحج"],
+                    correct: 3
+                }
+            ],
+            26: [ // اليوم 26 من رمضان
+                {
+                    question: "ما هي أول سورة نزلت على النبي ﷺ؟",
+                    options: ["سورة الفاتحة", "سورة العلق", "سورة المدثر", "سورة القلم"],
+                    correct: 1
+                },
+                {
+                    question: "من هو النبي الذي بنى الكعبة المشرفة؟",
+                    options: ["نوح عليه السلام", "إبراهيم عليه السلام", "آدم عليه السلام", "محمد ﷺ"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو الشهر الذي يلي رمضان في التقويم الهجري؟",
+                    options: ["شعبان", "شوال", "ذو القعدة", "ذو الحجة"],
+                    correct: 1
+                },
+                {
+                    question: "كم عدد أركان الإيمان؟",
+                    options: ["4", "5", "6", "7"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي أعظم آية في القرآن الكريم؟",
+                    options: ["آية الكرسي", "آخر سورة البقرة", "أول سورة الفاتحة", "آية النور"],
+                    correct: 0
+                }
+            ],
+            27: [ // اليوم 27 من رمضان
+                {
+                    question: "ما هي الصلاة التي لا تقصر في السفر؟",
+                    options: ["الظهر", "العصر", "المغرب", "العشاء"],
+                    correct: 2
+                },
+                {
+                    question: "من هو أول من سيدخل الجنة من البشر؟",
+                    options: ["آدم عليه السلام", "إبراهيم عليه السلام", "محمد ﷺ", "عيسى عليه السلام"],
+                    correct: 2
+                },
+                {
+                    question: "ما هي السورة التي تسمى بأم الكتاب؟",
+                    options: ["سورة البقرة", "سورة الفاتحة", "سورة يس", "سورة الإخلاص"],
+                    correct: 1
+                },
+                {
+                    question: "كم عدد الصحابة الذين شهدوا بيعة الرضوان؟",
+                    options: ["1000 صحابي", "1200 صحابي", "1400 صحابي", "1600 صحابي"],
+                    correct: 2
+                },
+                {
+                    question: "ما هو أول ما خلق الله تعالى؟",
+                    options: ["الأرض", "السماوات", "القلم", "العرش"],
+                    correct: 2
+                }
+            ],
+            28: [ // اليوم 28 من رمضان
+                {
+                    question: "ما هي السورة التي تبدأ بالحمد وتنتهي بالحمد؟",
+                    options: ["سورة الفاتحة", "سورة الأنعام", "سورة الكهف", "سورة فاطر"],
+                    correct: 2
+                },
+                {
+                    question: "من هو الصحابي الذي لقب بـ «سيف الله المسلول»؟",
+                    options: ["علي بن أبي طالب", "خالد بن الوليد", "سعد بن أبي وقاص", "عمر بن الخطاب"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو الركن الأول من أركان الإسلام؟",
+                    options: ["الصلاة", "الصوم", "الشهادتان", "الزكاة"],
+                    correct: 2
+                },
+                {
+                    question: "ما هو عدد سور القرآن الكريم؟",
+                    options: ["104", "114", "124", "134"],
+                    correct: 1
+                },
+                {
+                    question: "من هو النبي الذي نجاه الله من النار؟",
+                    options: ["موسى عليه السلام", "نوح عليه السلام", "إبراهيم عليه السلام", "يونس عليه السلام"],
+                    correct: 2
+                }
+            ],
+            29: [ // اليوم 29 من رمضان
+                {
+                    question: "ما هي السورة التي ذكر فيها البسملة مرتين؟",
+                    options: ["سورة النمل", "سورة الكهف", "سورة البقرة", "سورة الفاتحة"],
+                    correct: 0
+                },
+                {
+                    question: "ما هو أول مسجد وضع في الأرض؟",
+                    options: ["المسجد النبوي", "المسجد الحرام", "المسجد الأقصى", "مسجد قباء"],
+                    correct: 1
+                },
+                {
+                    question: "كم عدد الصلوات المفروضة في اليوم والليلة؟",
+                    options: ["3 صلوات", "4 صلوات", "5 صلوات", "6 صلوات"],
+                    correct: 2
+                },
+                {
+                    question: "من هو النبي الذي كلمه الله تكليماً؟",
+                    options: ["إبراهيم عليه السلام", "موسى عليه السلام", "عيسى عليه السلام", "محمد ﷺ"],
+                    correct: 1
+                },
+                {
+                    question: "ما هو اليوم الذي يستحب فيه صيام يوم عرفة؟",
+                    options: ["8 ذو الحجة", "9 ذو الحجة", "10 ذو الحجة", "1 ذو الحجة"],
+                    correct: 1
+                }
+            ]
+        };
 
-                  const message = countdownMessages[currentIndex];
-                  document.getElementById('countdown-number').textContent = message.number;
-                  document.getElementById('countdown-text').textContent = message.text;
+        // تحديد العناصر
+        const elements = {
+            dayName: document.getElementById('day-name'),
+            currentDate: document.getElementById('current-date'),
+            startScreen: document.getElementById('start-screen'),
+            outOfTimeScreen: document.getElementById('out-of-time-screen'),
+            alreadyParticipatedScreen: document.getElementById('already-participated-screen'),
+            timeMessage: document.getElementById('time-message'),
+            playerName: document.getElementById('player-name'),
+            startButton: document.getElementById('start-button'),
+            countdownScreen: document.getElementById('countdown-screen'),
+            countdownNumber: document.getElementById('countdown-number'),
+            countdownText: document.getElementById('countdown-text'),
+            quizScreen: document.getElementById('quiz-screen'),
+            playerWelcome: document.getElementById('player-welcome'),
+            questionText: document.getElementById('question-text'),
+            optionsContainer: document.getElementById('options-container'),
+            timer: document.getElementById('timer'),
+            timerBar: document.getElementById('timer-bar'),
+            questionCounter: document.getElementById('question-counter'),
+            resultsScreen: document.getElementById('results-screen'),
+            finalName: document.getElementById('final-name'),
+            finalScore: document.getElementById('final-score'),
+            answersReview: document.getElementById('answers-review')
+        };
 
-                  currentIndex++;
-                  setTimeout(updateCountdown, 1000);
-              }
+        // حالة اللعبة
+        const gameState = {
+            playerName: '',
+            questions: [],
+            currentQuestion: 0,
+            score: 0,
+            answers: [],
+            timer: null,
+            questionStartTime: 0,
+            isAnswered: false,
+            totalTime: 0,
+            questionTimes: []
+        };
 
-              updateCountdown();
-          }
+        // تحديث التاريخ والوقت
+        function updateDateTime() {
+            const now = new Date();
+            const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+            const months = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+            
+            elements.dayName.textContent = days[now.getDay()];
+            elements.currentDate.textContent = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        }
 
-          // عرض السؤال
-          function showQuestion() {
-              elements.quizScreen.classList.remove('hidden');
-              gameState.isAnswered = false;
-              
-              const question = gameState.questions[gameState.currentQuestion];
-              elements.questionCounter.textContent = `السؤال ${gameState.currentQuestion + 1} من ${gameState.questions.length}`;
-              elements.questionText.textContent = question.question;
-              
-              elements.optionsContainer.innerHTML = question.options.map((option, index) => `
-                  <button
-                      onclick="handleAnswer(${index})"
-                      class="w-full text-right bg-white/5 hover:bg-white/10 border-2 border-green-400/20 p-4 rounded-xl transition-colors"
-                  >
-                      ${option}
-                  </button>
-              `).join('');
+        // التحقق من وقت المسابقة
+        function checkQuizTime() {
+            const now = new Date();
+            const hour = now.getHours();
+            return hour >= 19 && hour < 20; // من 7 مساءً إلى 8 مساءً
+        }
 
-              gameState.questionStartTime = Date.now();
-              startTimer();
-              lucide.createIcons();
-          }
+        // تحديث رسالة الوقت
+        function updateTimeMessage() {
+            const now = new Date();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            
+            if (hour < 19) {
+                const hoursRemaining = 18 - hour;
+                const minutesRemaining = 59 - minute;
+                elements.timeMessage.textContent = `المسابقة ستبدأ بعد ${hoursRemaining} ساعة و ${minutesRemaining} دقيقة`;
+            } else if (hour >= 20) {
+                elements.timeMessage.textContent = 'المسابقة انتهت اليوم، تفضل بزيارتنا غداً';
+            }
+        }
 
-          // معالجة الإجابة
-          function handleAnswer(selectedOption) {
-              if (gameState.isAnswered) return;
-              gameState.isAnswered = true;
-              
-              clearInterval(gameState.timer);
-              const answerTime = (Date.now() - gameState.questionStartTime) / 1000;
-              gameState.questionTimes.push(answerTime);
-              
-              const question = gameState.questions[gameState.currentQuestion];
-              const isCorrect = selectedOption === question.correct;
-              
-              let points = 0;
-              if (isCorrect) {
-                  if (answerTime <= 3) points = 100;
-                  else if (answerTime <= 5) points = 80;
-                  else if (answerTime <= 7) points = 60;
-                  else points = 40;
-              }
-              
-              gameState.score += points;
-              gameState.totalTime += answerTime;
+        // التحقق من المشاركة السابقة
+        async function checkPreviousParticipation(playerName) {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const participantsRef = db.collection('participants');
+                const query = await participantsRef.where('name', '==', playerName)
+                    .where('date', '==', today)
+                    .get();
+                
+                return !query.empty;
+            } catch (error) {
+                console.error('Error checking previous participation:', error);
+                return false;
+            }
+        }
 
-              const options = elements.optionsContainer.children;
-              Array.from(options).forEach(option => {
-                  option.classList.add('option-disabled');
-              });
-              
-              options[selectedOption].classList.add(isCorrect ? 'option-correct' : 'option-wrong');
-              if (!isCorrect) {
-                  options[question.correct].classList.add('option-correct');
-              }
+        // تهيئة المسابقة
+        async function initializeQuiz() {
+            try {
+                updateDateTime();
+                const isQuizTime = checkQuizTime();
+                
+                // تحديد اليوم الحالي من رمضان
+                const currentRamadanDay = getCurrentRamadanDay();
+                
+                // التحقق من وجود أسئلة لليوم الحالي
+                if (!ramadanQuestions[currentRamadanDay]) {
+                    console.error('لا توجد أسئلة لهذا اليوم');
+                    alert('عذراً، لا توجد أسئلة متاحة لهذا اليوم');
+                    return;
+                }
 
-              gameState.answers.push({
-                  question: question.question,
-                  selectedAnswer: question.options[selectedOption],
-                  correctAnswer: question.options[question.correct],
-                  isCorrect: isCorrect,
-                  time: answerTime,
-                  points: points
-              });
+                // تحديث بنك الأسئلة باستخدام أسئلة اليوم الحالي
+                gameState.questions = [...ramadanQuestions[currentRamadanDay]];
+                
+                if (!isQuizTime) {
+                    elements.startScreen.classList.add('hidden');
+                    elements.outOfTimeScreen.classList.remove('hidden');
+                    updateTimeMessage();
+                    setInterval(updateTimeMessage, 60000);
+                    return;
+                }
 
-              setTimeout(() => {
-                  if (gameState.currentQuestion < gameState.questions.length - 1) {
-                      gameState.currentQuestion++;
-                      showQuestion();
-                  } else {
-                      showResults();
-                  }
-              }, 1500);
-          }
+                elements.startScreen.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error initializing quiz:', error);
+                alert('حدث خطأ في تحميل المسابقة. يرجى تحديث الصفحة.');
+            }
+        }
 
-          // بدء المؤقت
-          function startTimer() {
-              gameState.timeLeft = 10;
-              elements.timer.textContent = gameState.timeLeft;
-              elements.timerBar.style.width = '100%';
-              
-              clearInterval(gameState.timer);
-              gameState.timer = setInterval(() => {
-                  gameState.timeLeft--;
-                  elements.timer.textContent = gameState.timeLeft;
-                  elements.timerBar.style.width = `${(gameState.timeLeft / 10) * 100}%`;
-                  
-                  if (gameState.timeLeft <= 0) {
-                      clearInterval(gameState.timer);
-                      handleTimeUp();
-                  }
-              }, 1000);
-          }
+        // دالة لحساب اليوم الحالي من رمضان
+        function getCurrentRamadanDay() {
+            // في هذا المثال، نستخدم يوم ثابت للتجربة
+            // في التطبيق الحقيقي، يجب حساب اليوم الحالي من رمضان بناءً على التقويم الهجري
+            return 15; // اليوم 15 من رمضان كمثال
+        }
 
-          // معالجة انتهاء الوقت
-          function handleTimeUp() {
-              if (gameState.isAnswered) return;
-              handleAnswer(-1);
-          }
+        // بدء المسابقة
+        async function startQuiz() {
+            try {
+                const playerName = elements.playerName.value.trim();
+                if (!playerName) {
+                    alert('الرجاء إدخال اسمك');
+                    return;
+                }
+                
+                const hasParticipated = await checkPreviousParticipation(playerName);
+                if (hasParticipated) {
+                    elements.startScreen.classList.add('hidden');
+                    elements.alreadyParticipatedScreen.classList.remove('hidden');
+                    return;
+                }
+                
+                gameState.playerName = playerName;
+                elements.playerWelcome.textContent = `مرحباً ${playerName}`;
+                
+                elements.startScreen.classList.add('hidden');
+                elements.countdownScreen.classList.remove('hidden');
+                
+                startCountdown();
+            } catch (error) {
+                console.error('Error starting quiz:', error);
+                alert('حدث خطأ في بدء المسابقة. يرجى المحاولة مرة أخرى.');
+            }
+        }
 
-          // عرض النتائج
-          async function showResults() {
-              try {
-                  elements.quizScreen.classList.add('hidden');
-                  elements.resultsScreen.classList.remove('hidden');
+        // العد التنازلي
+        function startCountdown() {
+            const countdownTexts = [
+                "استعد التحدي سيبدأ! 🔥",
+                "ركّز، الفرصة أمامك! 🚀",
+                "لحظات للحسم، لا تتردد! ⚡️",
+                "كن الأسرع، كن الأذكى! 🏆",
+                "الآن… أطلق إبداعك! 🎯"
+            ];
+            
+            let count = 5;
+            elements.countdownNumber.textContent = count;
+            elements.countdownText.textContent = countdownTexts[0];
+            
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    elements.countdownNumber.textContent = count;
+                    elements.countdownNumber.classList.remove('countdown-number');
+                    void elements.countdownNumber.offsetWidth;
+                    elements.countdownNumber.classList.add('countdown-number');
+                    
+                    elements.countdownText.textContent = countdownTexts[5 - count];
+                    elements.countdownText.classList.remove('countdown-text');
+                    void elements.countdownText.offsetWidth;
+                    elements.countdownText.classList.add('countdown-text');
+                } else {
+                    clearInterval(interval);
+                    elements.countdownScreen.classList.add('hidden');
+                    elements.quizScreen.classList.remove('hidden');
+                    showQuestion();
+                }
+            }, 1000);
+        }
 
-                  const playerData = {
-                      playerName: gameState.playerName,
-                      score: gameState.score,
-                      totalTime: gameState.totalTime,
-                      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                  };
+        // عرض السؤال
+        function showQuestion() {
+            gameState.isAnswered = false;
+            const question = gameState.questions[gameState.currentQuestion];
+            
+            elements.questionText.textContent = question.question;
+            elements.questionCounter.textContent = `السؤال ${gameState.currentQuestion + 1} من ${gameState.questions.length}`;
+            
+            elements.optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'bg-white/5 border-2 border-white/20 rounded-xl p-4 cursor-pointer hover:bg-white/10 transition-colors';
+                optionElement.textContent = option;
+                optionElement.onclick = () => handleAnswer(index);
+                elements.optionsContainer.appendChild(optionElement);
+            });
+            
+            startTimer();
+        }
 
-                  await db.collection('scores').add(playerData);
+        // بدء المؤقت
+        function startTimer() {
+            let timeLeft = 10;
+            elements.timer.textContent = timeLeft;
+            elements.timerBar.style.width = '100%';
+            
+            gameState.questionStartTime = Date.now();
+            
+            gameState.timer = setInterval(() => {
+                timeLeft--;
+                elements.timer.textContent = timeLeft;
+                elements.timerBar.style.width = `${timeLeft * 10}%`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(gameState.timer);
+                    handleAnswer(-1); // لم يتم اختيار إجابة
+                }
+            }, 1000);
+        }
 
-                  document.getElementById('final-name').textContent = `الاسم: ${gameState.playerName}`;
-                  document.getElementById('final-score').innerHTML = `
-                      النقاط: ${gameState.score}<br>
-                      الوقت الإجمالي: ${gameState.totalTime.toFixed(2)} ثانية
-                  `;
+        // معالجة الإجابة
+        function handleAnswer(selectedOption) {
+            if (gameState.isAnswered) return;
+            gameState.isAnswered = true;
+            
+            clearInterval(gameState.timer);
+            const answerTime = (Date.now() - gameState.questionStartTime) / 1000;
+            gameState.questionTimes.push(answerTime);
+            
+            const question = gameState.questions[gameState.currentQuestion];
+            const isCorrect = selectedOption >= 0 && selectedOption === question.correct;
+            
+            let points = 0;
+            if (isCorrect) {
+                if (answerTime <= 3) points = 100;
+                else if (answerTime <= 5) points = 80;
+                else if (answerTime <= 7) points = 60;
+                else points = 40;
+            }
+            
+            gameState.score += points;
+            gameState.totalTime += answerTime;
 
-                  const answersHtml = gameState.answers.map((answer, index) => `
-                      <div class="bg-white/5 p-4 rounded-xl">
-                          <div class="font-bold mb-2">السؤال ${index + 1}</div>
-                          <div class="text-sm opacity-90 mb-2">${answer.question}</div>
-                          <div class="text-sm ${answer.isCorrect ? 'text-green-400' : 'text-red-400'}">
-                              إجابتك: ${answer.selectedAnswer}
-                              ${!answer.isCorrect ? `<br>الإجابة الصحيحة: ${answer.correctAnswer}` : ''}
-                          </div>
-                          <div class="text-sm mt-2">
-                              الوقت: ${answer.time.toFixed(2)} ثانية
-                              <br>
-                              النقاط: ${answer.points}
-                          </div>
-                      </div>
-                  `).join('');
+            const options = elements.optionsContainer.children;
+            Array.from(options).forEach(option => {
+                option.classList.add('option-disabled');
+            });
+            
+            if (selectedOption >= 0) {
+                options[selectedOption].classList.add(isCorrect ? 'option-correct' : 'option-wrong');
+            }
+            
+            options[question.correct].classList.add('option-correct');
 
-                  document.getElementById('answers-review').innerHTML = answersHtml;
-                  lucide.createIcons();
+            gameState.answers.push({
+                question: question.question,
+                selectedAnswer: selectedOption >= 0 ? question.options[selectedOption] : "لم يتم الإجابة",
+                correctAnswer: question.options[question.correct],
+                isCorrect: isCorrect,
+                time: answerTime,
+                points: points
+            });
 
-              } catch (error) {
-                  console.error('Error saving results:', error);
-                  alert('حدث خطأ في حفظ النتيجة. يرجى المحاولة مرة أخرى.');
-              }
-          }
+            setTimeout(() => {
+                if (gameState.currentQuestion < gameState.questions.length - 1) {
+                    gameState.currentQuestion++;
+                    showQuestion();
+                } else {
+                    showResults();
+                }
+            }, 1500);
+        }
 
-          // بدء المسابقة
-          async function startQuiz() {
-              try {
-                  gameState.playerName = elements.playerNameInput.value.trim();
-                  
-                  if (checkLocalParticipation()) {
-                      elements.startScreen.classList.add('hidden');
-                      elements.alreadyParticipatedScreen.classList.remove('hidden');
-                      return;
-                  }
+        // عرض النتائج
+        async function showResults() {
+            try {
+                elements.quizScreen.classList.add('hidden');
+                elements.resultsScreen.classList.remove('hidden');
+                
+                elements.finalName.textContent = `الاسم: ${gameState.playerName}`;
+                elements.finalScore.textContent = `النقاط: ${gameState.score} | الوقت الإجمالي: ${gameState.totalTime.toFixed(2)} ثانية`;
+                
+                elements.answersReview.innerHTML = '';
+                gameState.answers.forEach((answer, index) => {
+                    const answerElement = document.createElement('div');
+                    answerElement.className = 'bg-white/5 border-2 border-white/20 rounded-xl p-4';
+                    
+                    answerElement.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold">السؤال ${index + 1}</span>
+                            <span class="${answer.isCorrect ? 'text-green-400' : 'text-red-400'}">${answer.isCorrect ? 'إجابة صحيحة' : 'إجابة خاطئة'}</span>
+                        </div>
+                        <p class="mb-2">${answer.question}</p>
+                        <div class="flex justify-between text-sm">
+                            <span>إجابتك: <span class="${answer.isCorrect ? 'text-green-400' : 'text-red-400'}">${answer.selectedAnswer}</span></span>
+                            <span>الإجابة الصحيحة: <span class="text-green-400">${answer.correctAnswer}</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm mt-2">
+                            <span>النقاط: ${answer.points}</span>
+                            <span>الوقت: ${answer.time.toFixed(2)} ثانية</span>
+                        </div>
+                    `;
+                    
+                    elements.answersReview.appendChild(answerElement);
+                });
+                
+                // حفظ النتيجة في قاعدة البيانات
+                await saveResults();
+            } catch (error) {
+                console.error('Error showing results:', error);
+                alert('حدث خطأ في عرض النتائج. يرجى المحاولة مرة أخرى.');
+            }
+        }
 
-                  recordLocalParticipation();
-                  
-                  // تسجيل المشارك في Firebase للإحصائيات فقط
-                  try {
-                      await db.collection('participants').add({
-                          playerName: gameState.playerName,
-                          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                      });
-                  } catch (error) {
-                      console.error('Error recording participation in Firebase:', error);
-                      // لا نوقف المسابقة في حالة فشل التسجيل في Firebase
-                  }
-                  
-                  gameState.questions = [...questionBank];
-                  elements.startScreen.classList.add('hidden');
-                  elements.playerWelcome.textContent = `مرحباً ${gameState.playerName}!`;
-                  
-                  startCountdown();
-              } catch (error) {
-                  console.error('Error starting quiz:', error);
-                  alert('حدث خطأ في بدء المسابقة. يرجى المحاولة مرة أخرى.');
-              }
-          }
+        // حفظ النتائج
+        async function saveResults() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                await db.collection('participants').add({
+                    name: gameState.playerName,
+                    score: gameState.score,
+                    time: gameState.totalTime,
+                    date: today,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('Results saved successfully');
+            } catch (error) {
+                console.error('Error saving results:', error);
+            }
+        }
 
-          // تهيئة المسابقة
-          async function initializeQuiz() {
-              try {
-                  updateDateTime();
-                  const isQuizTime = checkQuizTime();
-                  
-                  if (!isQuizTime) {
-                      elements.startScreen.classList.add('hidden');
-                      elements.outOfTimeScreen.classList.remove('hidden');
-                      updateTimeMessage();
-                      setInterval(updateTimeMessage, 60000);
-                      return;
-                  }
+        // إضافة مستمعي الأحداث
+        elements.playerName.addEventListener('input', () => {
+            elements.startButton.disabled = !elements.playerName.value.trim();
+        });
 
-                  elements.startScreen.classList.remove('hidden');
-              } catch (error) {
-                  console.error('Error initializing quiz:', error);
-                  alert('حدث خطأ في تحميل المسابقة. يرجى تحديث الصفحة.');
-              }
-          }
+        elements.startButton.addEventListener('click', startQuiz);
 
-          // إضافة مستمعي الأحداث
-          elements.playerNameInput.addEventListener('input', () => {
-              elements.startButton.disabled = !elements.playerNameInput.value.trim();
-          });
+        // تهيئة الأيقونات
+        lucide.createIcons();
 
-          elements.startButton.addEventListener('click', startQuiz);
-
-          // التحقق من الوقت كل دقيقة
-          setInterval(() => {
-              const isQuizTime = checkQuizTime();
-              if (!isQuizTime && !elements.outOfTimeScreen.classList.contains('hidden')) {
-                  window.location.href = 'leaderboard.html';
-              }
-          }, 60000);
-
-          // بدء التطبيق
-          document.addEventListener('DOMContentLoaded', function() {
-              try {
-                  lucide.createIcons();
-                  initializeQuiz();
-              } catch (error) {
-                  console.error('Error initializing app:', error);
-              }
-          });
-      </script>
-  </body>
-  </html> 
+        // بدء التطبيق
+        document.addEventListener('DOMContentLoaded', initializeQuiz);
+    </script>
+</body>
+</html>
