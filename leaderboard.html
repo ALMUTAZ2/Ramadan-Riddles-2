@@ -34,18 +34,6 @@
         .trophy-2 { color: #C0C0C0; }
         .trophy-3 { color: #CD7F32; }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        silver: '#C0C0C0',
-                        bronze: '#CD7F32'
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 <body class="bg-gradient-to-b from-blue-900 to-indigo-950 min-h-screen">
     <!-- شريط التاريخ -->
@@ -66,7 +54,7 @@
             <div class="bg-white/10 backdrop-blur-lg border-2 border-yellow-400/20 rounded-3xl p-8 text-center">
                 <i data-lucide="hourglass" class="w-16 h-16 mx-auto text-yellow-400 mb-4"></i>
                 <h2 class="text-2xl font-bold text-yellow-400 mb-4">النتائج قيد التحديث</h2>
-                <p class="text-gray-300 mb-4">سيتم نشر نتائج اليوم بعد انتهاء المسابقة في تمام الساعة 8 مساءً</p>
+                <p class="text-gray-300 mb-4">سيتم نشر نتائج اليوم بعد انتهاء المسابقة في تمام الساعة 6:45 مساءً</p>
                 <button onclick="location.href='index.html'" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 rounded-xl">
                     العودة للصفحة الرئيسية
                 </button>
@@ -157,11 +145,8 @@
 
         let db;
         try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
+            firebase.initializeApp(firebaseConfig);
             db = firebase.firestore();
-            console.log('Firebase initialized successfully');
         } catch (error) {
             console.error('Error initializing Firebase:', error);
         }
@@ -169,11 +154,12 @@
         // تحديث التاريخ
         function updateDateTime() {
             const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-            const months = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
             const now = new Date();
+            const dayName = days[now.getDay()];
+            const date = now.toLocaleDateString('ar-SA');
             
-            document.getElementById('day-name').textContent = days[now.getDay()];
-            document.getElementById('current-date').textContent = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+            document.getElementById('day-name').textContent = dayName;
+            document.getElementById('current-date').textContent = date;
         }
 
         // جلب النتائج
@@ -182,9 +168,8 @@
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
-                // استخدام مجموعة participants بدلاً من scores
-                const snapshot = await db.collection('participants')
-                    .where('date', '==', today.toISOString().split('T')[0])
+                const snapshot = await db.collection('scores')
+                    .where('timestamp', '>=', today)
                     .orderBy('timestamp', 'desc')
                     .get();
 
@@ -199,31 +184,31 @@
                 // ترتيب النتائج حسب النقاط والوقت
                 results.sort((a, b) => {
                     if (b.score !== a.score) return b.score - a.score;
-                    return a.time - b.time;
+                    return a.totalTime - b.totalTime;
                 });
 
                 // عرض المراكز الثلاثة الأولى
                 if (results.length > 0) {
                     document.getElementById('first-place').innerHTML = `
-                        <div class="font-bold">${results[0].name}</div>
+                        <div class="font-bold">${results[0].playerName}</div>
                         <div class="text-yellow-400">${results[0].score} نقطة</div>
-                        <div class="text-sm opacity-75">${results[0].time.toFixed(2)} ثانية</div>
+                        <div class="text-sm opacity-75">${results[0].totalTime.toFixed(2)} ثانية</div>
                     `;
                 }
 
                 if (results.length > 1) {
                     document.getElementById('second-place').innerHTML = `
-                        <div class="font-bold">${results[1].name}</div>
+                        <div class="font-bold">${results[1].playerName}</div>
                         <div class="text-silver">${results[1].score} نقطة</div>
-                        <div class="text-sm opacity-75">${results[1].time.toFixed(2)} ثانية</div>
+                        <div class="text-sm opacity-75">${results[1].totalTime.toFixed(2)} ثانية</div>
                     `;
                 }
 
                 if (results.length > 2) {
                     document.getElementById('third-place').innerHTML = `
-                        <div class="font-bold">${results[2].name}</div>
+                        <div class="font-bold">${results[2].playerName}</div>
                         <div class="text-bronze">${results[2].score} نقطة</div>
-                        <div class="text-sm opacity-75">${results[2].time.toFixed(2)} ثانية</div>
+                        <div class="text-sm opacity-75">${results[2].totalTime.toFixed(2)} ثانية</div>
                     `;
                 }
 
@@ -232,15 +217,15 @@
                 tableBody.innerHTML = results.map((result, index) => `
                     <tr class="border-b border-white/10 animate-slide-in" style="animation-delay: ${index * 0.1}s">
                         <td class="p-3">${index + 1}</td>
-                        <td class="p-3">${result.name}</td>
+                        <td class="p-3">${result.playerName}</td>
                         <td class="p-3">${result.score}</td>
-                        <td class="p-3">${result.time.toFixed(2)} ثانية</td>
+                        <td class="p-3">${result.totalTime.toFixed(2)} ثانية</td>
                     </tr>
                 `).join('');
 
                 // تحديث تاريخ النتائج
                 document.getElementById('results-date').textContent = 
-                    `نتائج ${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+                    `نتائج ${new Date().toLocaleDateString('ar-SA')}`;
 
             } catch (error) {
                 console.error('Error fetching results:', error);
@@ -255,8 +240,10 @@
 
             const now = new Date();
             const hour = now.getHours();
+            const minutes = now.getMinutes();
 
-            if (hour >= 20) {
+            // تعديل الشرط ليظهر النتائج بعد الساعة 18:45 (6:45 مساءً)
+            if (hour > 18 || (hour === 18 && minutes >= 45)) {
                 document.getElementById('waiting-screen').classList.add('hidden');
                 document.getElementById('results-screen').classList.remove('hidden');
                 fetchResults();
